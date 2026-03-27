@@ -1,0 +1,17 @@
+# Credentials — never commit these
+.env
+service_account.json
+
+# Output files
+transactions.xlsx
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/

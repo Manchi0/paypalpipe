@@ -42,7 +42,9 @@ log = logging.getLogger(__name__)
 PAYPAL_CLIENT_ID     = os.environ["PAYPAL_CLIENT_ID"]
 PAYPAL_CLIENT_SECRET = os.environ["PAYPAL_CLIENT_SECRET"]
 PAYPAL_MODE          = os.getenv("PAYPAL_MODE", "sandbox")
-PAYPAL_DAYS_BACK     = int(os.getenv("PAYPAL_DAYS_BACK", "30"))
+PAYPAL_START_DATE    = datetime.strptime(
+    os.getenv("PAYPAL_START_DATE", "2026-01-15"), "%Y-%m-%d"
+)
 
 PAYPAL_BASE = (
     "https://api-m.sandbox.paypal.com"
@@ -83,26 +85,18 @@ def _fmt_date(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S+0000")
 
 
-def fetch_transactions(token: str) -> list[dict]:
-    """
-    Fetch all transactions from the past PAYPAL_DAYS_BACK days.
-    Handles pagination automatically.
-    PayPal allows a maximum 31-day window per request.
-    """
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    start = now - timedelta(days=min(PAYPAL_DAYS_BACK, 31))
-
+def _fetch_window(token: str, start: datetime, end: datetime) -> list[dict]:
+    """Fetch all paginated transactions within a single <=31-day window."""
     all_rows: list[dict] = []
     page = 1
-
     while True:
         params = {
             "start_date": _fmt_date(start),
-            "end_date":   _fmt_date(now),
+            "end_date":   _fmt_date(end),
             "fields":     "transaction_info,payer_info",
             "page_size":  500,
             "page":       page,
-            "transaction_status": "S",  # S = Successful (completed payments)
+            "transaction_status": "S",
         }
         response = requests.get(
             f"{PAYPAL_BASE}/v1/reporting/transactions",
@@ -124,6 +118,26 @@ def fetch_transactions(token: str) -> list[dict]:
         if page >= total_pages:
             break
         page += 1
+    return all_rows
+
+
+def fetch_transactions(token: str) -> list[dict]:
+    """
+    Fetch all transactions from PAYPAL_START_DATE to now.
+    Automatically chunks into <=31-day windows (PayPal API limit).
+    """
+    now   = datetime.now(timezone.utc).replace(tzinfo=None)
+    start = PAYPAL_START_DATE
+
+    all_rows: list[dict] = []
+    window = timedelta(days=31)
+    chunk_start = start
+
+    while chunk_start < now:
+        chunk_end = min(chunk_start + window, now)
+        log.info("Fetching window %s → %s", _fmt_date(chunk_start), _fmt_date(chunk_end))
+        all_rows.extend(_fetch_window(token, chunk_start, chunk_end))
+        chunk_start = chunk_end
 
     log.info("Total transactions fetched: %d", len(all_rows))
     return all_rows

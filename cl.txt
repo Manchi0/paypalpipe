@@ -1,2 +1,0 @@
-client=ARVUets-NLqzaTkw-BK05PwikhxjRh07hMjw3Mla6sRL_bBuhNAT4c8axtSMV4w5v5Y5mIU5syN_ohjb
-secret=EMXLPvKn9nXiBNlJ_AbiKsB0z4d4xgjw41fQoGpI-eRRu8HB-3C3QDsSIBbmazJMeOf-kH0lCPe5fIQD
